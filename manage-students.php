@@ -1,5 +1,23 @@
 <?php
-include 'Database/lits.php'
+
+include 'Database/lits.php';
+
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['Submit'])) {
+    $Student_name = $_POST['Student_name'];
+    $Student_Email = $_POST['Student_Email'];
+    $Student_Password = password_hash($_POST['Student_Password'], PASSWORD_DEFAULT); 
+    $Student_qr = $_POST['Student_qr'];
+
+    $stmt = $conn->prepare("INSERT INTO user_student (Student_name, Student_Email, Student_Password, Student_qr) VALUES (?, ?, ?, ?)");
+    $stmt->bind_param("ssss", $Student_name, $Student_Email, $Student_Password, $Student_qr);
+
+    if ($stmt->execute()) {
+        echo "New record created successfully";
+    } else {
+        echo "Error: " . $stmt->error;
+    }
+    $stmt->close();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -11,20 +29,23 @@ include 'Database/lits.php'
     <link id="dark-mode-stylesheet" rel="stylesheet" href="Css/darkmode.css" disabled>
     <link rel="stylesheet" href="Css/table.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/webrtc-adapter/3.3.3/adapter.min.js"></script>
+    <script type="text/javascript" src="https://cdnjs.cloudflare.com/ajax/libs/vue/2.1.10/vue.min.js"></script>
+    <script type="text/javascript" src="https://rawgit.com/schmich/instascan-builds/master/instascan.min.js"></script>
+
     <style>
-        /* Popup Form Styles */
-        .popup {
+            .popup {
             display: none; /* Hidden by default */
             position: fixed;
             left: 0;
             top: 0;
             width: 100%;
             height: 100%;
-            background-color: rgba(0, 0, 0, 0.5); /* Overlay background */
+            background-color: rgba(0, 0, 0, 0.5); 
             justify-content: center;
             align-items: center;
             z-index: 1000;
-            
         }
 
         .popup-content {
@@ -33,8 +54,6 @@ include 'Database/lits.php'
             width: 400px;
             max-width: 90%;
             border-radius: 15px;
-         
-              
         }
 
         .popup-content h2 {
@@ -72,6 +91,35 @@ include 'Database/lits.php'
         .popup-content button:hover {
             opacity: 0.8;
         }
+        #modal {
+            display: none; 
+            position: fixed; 
+            z-index: 1100; /* On top of popup */
+            left: 0;
+            top: 0;
+            width: 100%; 
+            height: 100%; 
+            overflow: auto; 
+            background-color: rgba(0,0,0,0.7); 
+            justify-content: center;
+            align-items: center;
+        }
+
+        #modal-content {
+            background-color: #fefefe;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #888;
+            width: 80%;
+            max-width: 600px;
+            position: relative;
+            border-radius: 15px;
+        }
+        video {
+            width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
     </style>
 </head>
 <body>
@@ -80,33 +128,36 @@ include 'Database/lits.php'
         <div class="main-content">
             <?php include 'header.php'; ?>
             <div class="top-boxes">
-               
+  <!------------------------------ Top boxes content --------------------->
             </div>
             <div class="content">
                 <div class="left-column">
                     <h2>Manage Student</h2>
-                    <button id="addUserBtn" class="add-btn"><i class="fas fa-user-plus"></i> Add User</button>
+                    <button id="addUserBtn" class="add-btn"><i class="fas fa-user-plus"></i> Add Student</button>
+                    <?php
+                    $select = mysqli_query($conn, "SELECT * FROM user_student")
+                    ?>
                     <table class="user-table">
                         <thead>
                             <tr>
-                                <th>User ID</th>
+                                <th>Student QR</th>
                                 <th>Name</th>
                                 <th>Email</th>
-                            
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
+                        <?php while ($row = mysqli_fetch_assoc($select)) { ?>
                             <tr>
-                                <td>1</td>
-                                <td>John Doe</td>
-                                <td>john.doe@example.com</td>
+                                <td><?php echo $row['Student_qr']; ?></td>
+                                <td><?php echo $row['Student_name']; ?></td>
+                                <td><?php echo $row['Student_Email']; ?></td>
                                 <td>
                                     <button class="edit-btn"><i class="fas fa-edit"></i> Edit</button>
                                     <button class="delete-btn"><i class="fas fa-trash"></i> Delete</button>
                                 </td>
                             </tr>
-                            <!-- Repeat <tr> for additional users -->
+                        <?php } ?>
                         </tbody>
                     </table>
                 </div>
@@ -114,43 +165,92 @@ include 'Database/lits.php'
         </div>
     </div>
 
-    <!-- Popup Form -->
+    <!-------------------- Popup Form --------------------------------------------------->
     <div id="popupForm" class="popup">
         <div class="popup-content">
             <h2>Add New User</h2>
-            <form id="addUserForm">
-                <label for="userName">Name:</label>
-                <input type="text" id="userName" name="userName" required>
-                <label for="userEmail">Email:</label>
-                <input type="email" id="userEmail" name="userEmail" required>
-                <label for="userRole">Role:</label>
-                <input type="text" id="userRole" name="userRole" required>
-                <button type="submit">Add User</button>
+            <form id="addUserForm" method="POST" action="">
+                <label for="Student_name">Name:</label>
+                <input type="text" id="Student_name" name="Student_name" required>
+
+                <label for="Student_Email">Email:</label>
+                <input type="email" id="Student_Email" name="Student_Email" required>
+
+                <label for="Student_Password">Password:</label>
+                <input type="text" id="Student_Password" name="Student_Password" required>
+
+                <label for="Student_qr">QR Code:</label>
+                <input type="text" id="Student_qr" name="Student_qr" placeholder="Scan or enter QR code" required>
+                <button type="button" id="openCameraBtn">Scan QR </button>
+
+                <button type="submit" name="Submit">Add </button>
                 <button type="button" class="cancel" id="cancelBtn">Cancel</button>
             </form>
         </div>
     </div>
 
-  
-    <script src="JS/script.js"></script>
-    <script src="JS/color.js"></script>
+    <!---------------------------------------- Camera---------------------------------------------------------- -->
+    <div id="modal">
+        <div id="modal-content">
+            <video id="video" autoplay></video>
+        </div>
+    </div>
+    <div id="error-message" style="color:red;"></div>
+    <!---------------------------------------- Script---------------------------------------------------------- -->
     <script>
-        // JavaScript for handling popup visibility
-        document.getElementById('addUserBtn').addEventListener('click', function() {
-            document.getElementById('popupForm').style.display = 'flex';
+    document.getElementById('addUserBtn').addEventListener('click', function() {
+        document.getElementById('popupForm').style.display = 'flex';
+    });
+
+    document.getElementById('cancelBtn').addEventListener('click', function() {
+        document.getElementById('popupForm').style.display = 'none';
+    });
+
+    let modal = document.getElementById('modal');
+    let video = document.getElementById('video');
+    let qrInput = document.getElementById('Student_qr');
+    let scanner;
+    let stream;
+    function startCamera() {
+        scanner = new Instascan.Scanner({ video: video });
+        scanner.addListener('scan', function (content) {
+            qrInput.value = content; 
+            closeModal(); 
         });
 
-        document.getElementById('cancelBtn').addEventListener('click', function() {
-            document.getElementById('popupForm').style.display = 'none';
+        Instascan.Camera.getCameras().then(function (cameras) {
+            if (cameras.length > 0) {
+                scanner.start(cameras[0]);
+                modal.style.display = "flex";
+            } else {
+                console.error('No cameras found.');
+            }
+        }).catch(function (e) {
+            console.error(e);
         });
+    }
+    function closeModal() {
+        if (scanner) {
+            scanner.stop(); 
+        }
+        modal.style.display = "none";
+    }
+    document.getElementById('openCameraBtn').addEventListener('click', (event) => {
+        event.stopPropagation(); 
+        startCamera();
+    });
+    window.addEventListener('click', function(event) {
+        if (event.target === modal) {
+            closeModal();
+        }
+    });
+    document.getElementById('modal-content').addEventListener('click', (event) => {
+        event.stopPropagation();
+    });
 
-        // Optional: Handle form submission with JavaScript if needed
-        document.getElementById('addUserForm').addEventListener('submit', function(e) {
-            e.preventDefault();
-            // Add form submission logic here
-            alert('User added!');
-            document.getElementById('popupForm').style.display = 'none';
-        });
-    </script>
+
+    
+</script>
+
 </body>
 </html>
